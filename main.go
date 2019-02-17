@@ -15,7 +15,7 @@ import (
 type Certificate struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
-	CreatedAt string    `json:"createdAt"` //should be type date?
+	CreatedAt string    `json:"createdAt"` // Will be a type date
 	OwnerID   string    `json:"ownerId"`
 	Year      int       `json:"year"`
 	Note      string    `json:"note"`
@@ -31,7 +31,7 @@ type User struct {
 
 // Transfer Struct
 type Transfer struct {
-	To     string `json:"to"` //should be type email?
+	To     string `json:"to"`
 	Status string `json:"status"`
 }
 
@@ -70,7 +70,6 @@ func initCertificates() {
 // Route handler GET certificates method
 func getCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("Encoding to the certificates ResponseWriter...")
 	json.NewEncoder(w).Encode(certificates)
 }
 
@@ -78,10 +77,8 @@ func getCertificates(w http.ResponseWriter, r *http.Request) {
 func getCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	fmt.Println("Looping through all certificates...")
 	for _, item := range certificates {
 		if item.ID == params["id"] {
-			fmt.Println("[getCertificate] Writing to response writer certificate{id}=" + item.ID)
 			json.NewEncoder(w).Encode(item)
 			return
 		}
@@ -92,7 +89,7 @@ func getCertificate(w http.ResponseWriter, r *http.Request) {
 func createCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var certificate Certificate
-	_ = json.NewDecoder(r.Body).Decode(&certificate)  //
+	_ = json.NewDecoder(r.Body).Decode(&certificate)
 	certificate.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
 	certificates = append(certificates, certificate)
 	json.NewEncoder(w).Encode(certificate)
@@ -101,7 +98,7 @@ func createCertificate(w http.ResponseWriter, r *http.Request) {
 // Route handler PATCH certificate/{id} method
 func patchCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	//To do: PATCH method can update individual fields in certificate
+	//Todo (Farouk): PATCH method can update individual fields in certificate
 }
 
 // Route handler PUT certificate/{id} method
@@ -112,7 +109,8 @@ func putCertificate(w http.ResponseWriter, r *http.Request) {
 		if item.ID == params["id"] {
 			certificates = append(certificates[:index], certificates[index+1:]...)
 			var certificate Certificate
-			_ = json.NewDecoder(r.Body).Decode(&certificate) //PUT method: implement error if missing fields
+			//TODO (Farouk): PUT method: implement error if missing fields
+			_ = json.NewDecoder(r.Body).Decode(&certificate)
 			certificate.ID = params["id"]
 			certificates = append(certificates, certificate)
 			json.NewEncoder(w).Encode(certificate)
@@ -124,11 +122,9 @@ func putCertificate(w http.ResponseWriter, r *http.Request) {
 func deleteCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	fmt.Println("Looping through all certificates...")
 	for index, item := range certificates {
 		if item.ID == params["id"] {
 			certificates = append(certificates[:index], certificates[index+1:]...)
-			fmt.Println("Deleted certificate with id=" + item.ID)
 			break
 		}
 	}
