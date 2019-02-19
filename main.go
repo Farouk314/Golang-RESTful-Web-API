@@ -7,6 +7,9 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
+
+	jwt "github.com/vladimiroff/jwt-go"
 
 	"github.com/gorilla/mux"
 )
@@ -36,30 +39,74 @@ type Transfer struct {
 }
 
 // In memory data
-var certificates []Certificate //Certificates
-var users []User               //Users
+var certificates []Certificate              //Certificates
+var users []User                            //Users
+var mySigningKey = []byte("mockSigningKey") //mock signing key
 
-// Initiate some certificates
-func initCertificates() {
+//Homehandler for basic testing
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode("HOMEPAGE")
+}
+
+// Initiate some in memory data
+func initInMemoryData() {
+	userA := User{
+		ID:    "0001",
+		Email: "0001@mail.com",
+		Name:  "Joseph",
+	}
+
+	userB := User{
+		ID:    "0002",
+		Email: "0002@mail.com",
+		Name:  "Roberto",
+	}
+	//userA's certificates:
 	certificates = append(certificates, Certificate{
 		ID:        "1",
 		Title:     "A certificate title",
 		CreatedAt: "do something for dates",
-		OwnerID:   "guid1",
-		Year:      2019,
-		Note:      "First Certificate",
+		OwnerID:   userA.ID,
+		Year:      2018,
+		Note:      "",
 		Transfer: &Transfer{
 			To:     "",
 			Status: "",
 		},
 	})
 	certificates = append(certificates, Certificate{
+		ID:        "3",
+		Title:     "A certificate title",
+		CreatedAt: "do something for dates",
+		OwnerID:   userA.ID,
+		Year:      2019,
+		Note:      "",
+		Transfer: &Transfer{
+			To:     "",
+			Status: "",
+		},
+	})
+	//userB's certificates
+	certificates = append(certificates, Certificate{
 		ID:        "2",
 		Title:     "A certificate title",
 		CreatedAt: "do something for dates",
-		OwnerID:   "guid2",
+		OwnerID:   userB.ID,
 		Year:      2015,
-		Note:      "Second Certificate",
+		Note:      "",
+		Transfer: &Transfer{
+			To:     "",
+			Status: "",
+		},
+	})
+	certificates = append(certificates, Certificate{
+		ID:        "7",
+		Title:     "A certificate title",
+		CreatedAt: "do something for dates",
+		OwnerID:   userB.ID,
+		Year:      2000,
+		Note:      "",
 		Transfer: &Transfer{
 			To:     "",
 			Status: "",
@@ -70,7 +117,10 @@ func initCertificates() {
 // Route handler GET certificates method
 func getCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(certificates)
+	err := json.NewEncoder(w).Encode(certificates)
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
 }
 
 // Route handler GET certificates/{id} method
@@ -79,9 +129,27 @@ func getCertificate(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	for _, item := range certificates {
 		if item.ID == params["id"] {
-			json.NewEncoder(w).Encode(item)
+			err := json.NewEncoder(w).Encode(item)
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+			}
 			return
 		}
+	}
+}
+
+func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var usersCertificates []Certificate
+	params := mux.Vars(r)
+	for _, item := range certificates {
+		if item.OwnerID == params["userId"] {
+			usersCertificates = append(usersCertificates, item)
+		}
+	}
+	err := json.NewEncoder(w).Encode(usersCertificates)
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
 	}
 }
 
@@ -92,7 +160,10 @@ func createCertificate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&certificate)
 	certificate.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
 	certificates = append(certificates, certificate)
-	json.NewEncoder(w).Encode(certificate)
+	err := json.NewEncoder(w).Encode(certificate)
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
 }
 
 // Route handler PATCH certificate/{id} method
@@ -113,7 +184,11 @@ func putCertificate(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewDecoder(r.Body).Decode(&certificate)
 			certificate.ID = params["id"]
 			certificates = append(certificates, certificate)
-			json.NewEncoder(w).Encode(certificate)
+			err := json.NewEncoder(w).Encode(certificate)
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+			}
+			return
 		}
 	}
 }
@@ -128,22 +203,121 @@ func deleteCertificate(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	json.NewEncoder(w).Encode(certificates)
+	err := json.NewEncoder(w).Encode(certificates)
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
 }
+
+func createUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var user User
+	_ = json.NewDecoder(r.Body).Decode(&user)
+	user.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
+	users = append(users, user)
+	//jwt?
+	//json.NewEncoder(w).Encode("")
+}
+
+func createTransfer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	for _, item := range certificates {
+		if item.ID == params["id"] && item.OwnerID == params["userId"] {
+			var certificate Certificate
+			//certificates = append(certificates[:index], certificates[index+1:]...)
+			err := json.NewDecoder(r.Body).Decode(&certificate)
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+				return
+			}
+			item.Transfer.To = certificate.Transfer.To
+			item.Transfer.Status = "Pending"
+		}
+	}
+}
+
+func acceptTransfer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	for _, item := range certificates {
+		if item.ID == params["id"] {
+			err := json.NewEncoder(w).Encode(item)
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+				return
+			}
+			item.OwnerID = params["userId"]
+			item.Transfer.To = ""
+			item.Transfer.Status = ""
+			break
+		}
+	}
+
+}
+
+//JWT generator
+func generateJWT() (string, error) {
+	fmt.Println("generateJWT...")
+	//Create the token
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	//Create a map to store our claims
+	claims := token.Claims.(jwt.MapClaims)
+
+	claims["admin"] = true
+	claims["name"] = "Rob Wind"
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+	//Sign the token
+	tokenString, err := token.SignedString(mySigningKey)
+
+	if err != nil {
+		fmt.Printf("Error: %s", err.Error())
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+//Get Token Handler
+var getTokenHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	validToken, err := generateJWT()
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
+
+	// fmt.Fprintf(w, validToken)
+	err = json.NewEncoder(w).Encode(validToken)
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
+	//Write token to responsewriter
+	//json.NewEncoder(w).Encode(tokenString)
+	//w.Write([]byte(tokenString))
+})
 
 // Main
 func main() {
 	fmt.Println("Running...")
 
-	initCertificates()
+	initInMemoryData()
 
+	//Router
+	// Need to change routes to those 3 endpoints listed on the pdf.
 	r := mux.NewRouter()
-	r.HandleFunc("/api/certificates", getCertificates).Methods("GET")
-	r.HandleFunc("/api/certificates/{id}", getCertificate).Methods("GET")
-	r.HandleFunc("/api/certificates", createCertificate).Methods("POST")
-	r.HandleFunc("/api/certificates/{id}", putCertificate).Methods("PUT")
-	r.HandleFunc("/api/certificates/{id}", patchCertificate).Methods("PATCH")
-	r.HandleFunc("/api/certificates/{id}", deleteCertificate).Methods("DELETE")
+	r.HandleFunc("/", homeHandler).Methods("GET")
+	r.HandleFunc("/certificate", createCertificate).Methods("POST")
+	r.HandleFunc("/certificates", getCertificates).Methods("GET")
+	r.HandleFunc("/certificate/{id}", getCertificate).Methods("GET")
+	r.HandleFunc("/certificate/{id}", putCertificate).Methods("PUT")
+	r.HandleFunc("/certificate/{id}", patchCertificate).Methods("PATCH")
+	r.HandleFunc("/certificate/{id}", deleteCertificate).Methods("DELETE")
+	r.HandleFunc("/users/{userId}/certificates", getUsersCertificates).Methods("GET")
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", createTransfer).Methods("POST") // PUT OR PATCH?
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", acceptTransfer).Methods("PUT")  //PUT or PATCH?
+	r.HandleFunc("/api/signup", createUser).Methods("POST")
+	r.HandleFunc("/get-token", getTokenHandler).Methods("GET")
 
 	s := &http.Server{
 		Addr:    ":8000",
