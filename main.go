@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -71,7 +73,7 @@ func initInMemoryData() {
 		Year:      2018,
 		Note:      "",
 		Transfer: &Transfer{
-			To:     "",
+			To:     "0002@mail.com",
 			Status: "",
 		},
 	})
@@ -157,12 +159,15 @@ func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 func createCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var certificate Certificate
-	_ = json.NewDecoder(r.Body).Decode(&certificate)
+	if err := json.NewDecoder(r.Body).Decode(&certificate); err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
+	//authHeader := r.Header().Set("")
+	//fmt.Printf("Auth: %v", authHeader)
 	certificate.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
 	certificates = append(certificates, certificate)
-	err := json.NewEncoder(w).Encode(certificate)
-	if err != nil {
-		fmt.Fprintf(w, err.Error())
+	if err := json.NewEncoder(w).Encode(certificate); err != nil {
+		panic(err)
 	}
 }
 
@@ -181,10 +186,13 @@ func putCertificate(w http.ResponseWriter, r *http.Request) {
 			certificates = append(certificates[:index], certificates[index+1:]...)
 			var certificate Certificate
 			//TODO (Farouk): PUT method: implement error if missing fields
-			_ = json.NewDecoder(r.Body).Decode(&certificate)
+			err := json.NewDecoder(r.Body).Decode(&certificate)
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+			}
 			certificate.ID = params["id"]
 			certificates = append(certificates, certificate)
-			err := json.NewEncoder(w).Encode(certificate)
+			err = json.NewEncoder(w).Encode(certificate)
 			if err != nil {
 				fmt.Fprintf(w, err.Error())
 			}
@@ -240,16 +248,20 @@ func createTransfer(w http.ResponseWriter, r *http.Request) {
 func acceptTransfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	for _, item := range certificates {
+	for index, item := range certificates {
 		if item.ID == params["id"] {
-			err := json.NewEncoder(w).Encode(item)
+			//need to check if userId's email corresponds to transfer.To email....
+			certificate := item
+			certificate.OwnerID = params["userId"]
+			certificate.Transfer.To = ""
+			certificate.Transfer.Status = ""
+			certificates = append(certificates[index:], certificates[index+1:]...)
+			certificates = append(certificates, certificate)
+			err := json.NewEncoder(w).Encode(certificate)
 			if err != nil {
 				fmt.Fprintf(w, err.Error())
 				return
 			}
-			item.OwnerID = params["userId"]
-			item.Transfer.To = ""
-			item.Transfer.Status = ""
 			break
 		}
 	}
@@ -297,14 +309,32 @@ var getTokenHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Reque
 	//w.Write([]byte(tokenString))
 })
 
+//Basic Authentication
+func basicAuth(handler http.HandlerFunc, userName string, password string, realm string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u, pw, ok := r.BasicAuth()
+		fmt.Println("u:" + u + "pw:" + pw)
+		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(userName)) != 1 || subtle.ConstantTimeCompare([]byte(pw), []byte(password)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+			w.WriteHeader(401)
+			w.Write([]byte("Unauthorised.\n"))
+			return
+		}
+
+		handler(w, r)
+	}
+}
+
 // Main
 func main() {
 	fmt.Println("Running...")
 
 	initInMemoryData()
+	data := "user:pw" //must be format user:pw to pass BasicAuth
+	dataEncoded := base64.StdEncoding.EncodeToString([]byte(data))
+	fmt.Println(dataEncoded) //will print base64 encoded of data. Header request format: Basic <b64EncodedString>
 
 	//Router
-	// Need to change routes to those 3 endpoints listed on the pdf.
 	r := mux.NewRouter()
 	r.HandleFunc("/", homeHandler).Methods("GET")
 	r.HandleFunc("/certificate", createCertificate).Methods("POST")
@@ -314,8 +344,8 @@ func main() {
 	r.HandleFunc("/certificate/{id}", patchCertificate).Methods("PATCH")
 	r.HandleFunc("/certificate/{id}", deleteCertificate).Methods("DELETE")
 	r.HandleFunc("/users/{userId}/certificates", getUsersCertificates).Methods("GET")
-	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", createTransfer).Methods("POST") // PUT OR PATCH?
-	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", acceptTransfer).Methods("PUT")  //PUT or PATCH?
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", createTransfer).Methods("POST")                                     // PUT OR PATCH?
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", basicAuth(acceptTransfer, "user", "pw", "my-realm")).Methods("PUT") //PUT or PATCH?
 	r.HandleFunc("/api/signup", createUser).Methods("POST")
 	r.HandleFunc("/get-token", getTokenHandler).Methods("GET")
 
