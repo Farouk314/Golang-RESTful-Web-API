@@ -4,9 +4,11 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
+	"mux"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,82 +47,96 @@ var certificates []Certificate              //Certificates
 var users []User                            //Users
 var mySigningKey = []byte("mockSigningKey") //mock signing key
 
+func lookUpUserIDByName(userName string) (string, error) {
+	for _, item := range users {
+		if item.Name == userName {
+			return item.ID, nil
+		}
+	}
+	return "", errors.New("Could not get user by name" + userName)
+}
+
 //Homehandler for basic testing
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode("HOMEPAGE")
+	if err := json.NewEncoder(w).Encode("HOMEPAGE"); err != nil {
+		panic(err)
+	}
 }
 
 // Initiate some in memory data
 func initInMemoryData() {
-	userA := User{
-		ID:    "0001",
-		Email: "0001@mail.com",
-		Name:  "Joseph",
-	}
-
-	userB := User{
-		ID:    "0002",
-		Email: "0002@mail.com",
-		Name:  "Roberto",
-	}
+	userA, userB := 0, 1
+	users = append(users,
+		User{
+			ID:    "A",
+			Email: "A@mail.com",
+			Name:  "userA",
+		},
+		User{
+			ID:    "B",
+			Email: "B@mail.com",
+			Name:  "userB",
+		},
+	)
 	//userA's certificates:
-	certificates = append(certificates, Certificate{
-		ID:        "1",
-		Title:     "A certificate title",
-		CreatedAt: "do something for dates",
-		OwnerID:   userA.ID,
-		Year:      2018,
-		Note:      "",
-		Transfer: &Transfer{
-			To:     "0002@mail.com",
-			Status: "",
+	certificates = append(certificates,
+		Certificate{
+			ID:        "1",
+			Title:     "A certificate title",
+			CreatedAt: "do something for dates",
+			OwnerID:   users[userA].ID,
+			Year:      2018,
+			Note:      "",
+			Transfer: &Transfer{
+				To:     "0002@mail.com",
+				Status: "",
+			}},
+		Certificate{
+			ID:        "3",
+			Title:     "A certificate title",
+			CreatedAt: "do something for dates",
+			OwnerID:   users[userA].ID,
+			Year:      2019,
+			Note:      "",
+			Transfer: &Transfer{
+				To:     "",
+				Status: "",
+			},
 		},
-	})
-	certificates = append(certificates, Certificate{
-		ID:        "3",
-		Title:     "A certificate title",
-		CreatedAt: "do something for dates",
-		OwnerID:   userA.ID,
-		Year:      2019,
-		Note:      "",
-		Transfer: &Transfer{
-			To:     "",
-			Status: "",
-		},
-	})
+	)
 	//userB's certificates
-	certificates = append(certificates, Certificate{
-		ID:        "2",
-		Title:     "A certificate title",
-		CreatedAt: "do something for dates",
-		OwnerID:   userB.ID,
-		Year:      2015,
-		Note:      "",
-		Transfer: &Transfer{
-			To:     "",
-			Status: "",
+	certificates = append(certificates,
+		Certificate{
+			ID:        "2",
+			Title:     "A certificate title",
+			CreatedAt: "do something for dates",
+			OwnerID:   users[userB].ID,
+			Year:      2015,
+			Note:      "",
+			Transfer: &Transfer{
+				To:     "",
+				Status: "",
+			}},
+		Certificate{
+			ID:        "7",
+			Title:     "A certificate title",
+			CreatedAt: "do something for dates",
+			OwnerID:   users[userB].ID,
+			Year:      2000,
+			Note:      "",
+			Transfer: &Transfer{
+				To:     "",
+				Status: "",
+			},
 		},
-	})
-	certificates = append(certificates, Certificate{
-		ID:        "7",
-		Title:     "A certificate title",
-		CreatedAt: "do something for dates",
-		OwnerID:   userB.ID,
-		Year:      2000,
-		Note:      "",
-		Transfer: &Transfer{
-			To:     "",
-			Status: "",
-		},
-	})
+	)
 }
 
 // Route handler GET certificates method
 func getCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(certificates)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(certificates); err != nil {
 		fmt.Fprintf(w, err.Error())
 	}
 }
@@ -131,8 +147,7 @@ func getCertificate(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	for _, item := range certificates {
 		if item.ID == params["id"] {
-			err := json.NewEncoder(w).Encode(item)
-			if err != nil {
+			if err := json.NewEncoder(w).Encode(item); err != nil {
 				fmt.Fprintf(w, err.Error())
 			}
 			return
@@ -140,6 +155,7 @@ func getCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//Route handler get users certificates method
 func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var usersCertificates []Certificate
@@ -149,8 +165,7 @@ func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 			usersCertificates = append(usersCertificates, item)
 		}
 	}
-	err := json.NewEncoder(w).Encode(usersCertificates)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(usersCertificates); err != nil {
 		fmt.Fprintf(w, err.Error())
 	}
 }
@@ -159,41 +174,46 @@ func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 func createCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var certificate Certificate
+
+	// TODO
+	user, _, _ := r.BasicAuth()
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&certificate); err != nil {
 		fmt.Fprintf(w, err.Error())
 	}
-	//authHeader := r.Header().Set("")
-	//fmt.Printf("Auth: %v", authHeader)
+	if certificate.Title == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{"title": "Title must be populated"})
+		return
+	}
+
+	certificate.OwnerID, _ = lookUpUserIDByName(user)
+	certificate.OwnerID = "2"
 	certificate.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
+	certificate.CreatedAt = "TODO Date"
+	certificate.Year = time.Now().Year()
 	certificates = append(certificates, certificate)
 	if err := json.NewEncoder(w).Encode(certificate); err != nil {
-		panic(err)
+		fmt.Fprintf(w, err.Error())
 	}
 }
 
-// Route handler PATCH certificate/{id} method
-func patchCertificate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	//Todo (Farouk): PATCH method can update individual fields in certificate
-}
-
 // Route handler PUT certificate/{id} method
-func putCertificate(w http.ResponseWriter, r *http.Request) {
+func patchCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	for index, item := range certificates {
 		if item.ID == params["id"] {
+			certificate := certificates[index]
 			certificates = append(certificates[:index], certificates[index+1:]...)
-			var certificate Certificate
-			//TODO (Farouk): PUT method: implement error if missing fields
-			err := json.NewDecoder(r.Body).Decode(&certificate)
-			if err != nil {
+
+			if err := json.NewDecoder(r.Body).Decode(&certificate); err != nil {
 				fmt.Fprintf(w, err.Error())
 			}
 			certificate.ID = params["id"]
+
 			certificates = append(certificates, certificate)
-			err = json.NewEncoder(w).Encode(certificate)
-			if err != nil {
+			if err := json.NewEncoder(w).Encode(certificate); err != nil {
 				fmt.Fprintf(w, err.Error())
 			}
 			return
@@ -211,8 +231,7 @@ func deleteCertificate(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	err := json.NewEncoder(w).Encode(certificates)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(certificates); err != nil {
 		fmt.Fprintf(w, err.Error())
 	}
 }
@@ -220,11 +239,11 @@ func deleteCertificate(w http.ResponseWriter, r *http.Request) {
 func createUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var user User
-	_ = json.NewDecoder(r.Body).Decode(&user)
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		panic(err)
+	}
 	user.ID = strconv.Itoa(rand.Intn(1000000)) //Mock ID - not safe
 	users = append(users, user)
-	//jwt?
-	//json.NewEncoder(w).Encode("")
 }
 
 func createTransfer(w http.ResponseWriter, r *http.Request) {
@@ -234,8 +253,7 @@ func createTransfer(w http.ResponseWriter, r *http.Request) {
 		if item.ID == params["id"] && item.OwnerID == params["userId"] {
 			var certificate Certificate
 			//certificates = append(certificates[:index], certificates[index+1:]...)
-			err := json.NewDecoder(r.Body).Decode(&certificate)
-			if err != nil {
+			if err := json.NewDecoder(r.Body).Decode(&certificate); err != nil {
 				fmt.Fprintf(w, err.Error())
 				return
 			}
@@ -253,12 +271,11 @@ func acceptTransfer(w http.ResponseWriter, r *http.Request) {
 			//need to check if userId's email corresponds to transfer.To email....
 			certificate := item
 			certificate.OwnerID = params["userId"]
-			certificate.Transfer.To = ""
-			certificate.Transfer.Status = ""
+			// certificate.Transfer.To = ""
+			// certificate.Transfer.Status = ""
 			certificates = append(certificates[index:], certificates[index+1:]...)
 			certificates = append(certificates, certificate)
-			err := json.NewEncoder(w).Encode(certificate)
-			if err != nil {
+			if err := json.NewEncoder(w).Encode(certificate); err != nil {
 				fmt.Fprintf(w, err.Error())
 				return
 			}
@@ -300,8 +317,7 @@ var getTokenHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Reque
 	}
 
 	// fmt.Fprintf(w, validToken)
-	err = json.NewEncoder(w).Encode(validToken)
-	if err != nil {
+	if err = json.NewEncoder(w).Encode(validToken); err != nil {
 		fmt.Fprintf(w, err.Error())
 	}
 	//Write token to responsewriter
@@ -328,31 +344,33 @@ func basicAuth(handler http.HandlerFunc, userName string, password string, realm
 // Main
 func main() {
 	fmt.Println("Running...")
-
-	initInMemoryData()
-	data := "user:pw" //must be format user:pw to pass BasicAuth
+	//initInMemoryData()
+	data := "userEmail:pw" //must be format user:password to pass BasicAuth Basic
 	dataEncoded := base64.StdEncoding.EncodeToString([]byte(data))
-	fmt.Println(dataEncoded) //will print base64 encoded of data. Header request format: Basic <b64EncodedString>
-
-	//Router
-	r := mux.NewRouter()
-	r.HandleFunc("/", homeHandler).Methods("GET")
-	r.HandleFunc("/certificate", createCertificate).Methods("POST")
-	r.HandleFunc("/certificates", getCertificates).Methods("GET")
-	r.HandleFunc("/certificate/{id}", getCertificate).Methods("GET")
-	r.HandleFunc("/certificate/{id}", putCertificate).Methods("PUT")
-	r.HandleFunc("/certificate/{id}", patchCertificate).Methods("PATCH")
-	r.HandleFunc("/certificate/{id}", deleteCertificate).Methods("DELETE")
-	r.HandleFunc("/users/{userId}/certificates", getUsersCertificates).Methods("GET")
-	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", createTransfer).Methods("POST")                                     // PUT OR PATCH?
-	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", basicAuth(acceptTransfer, "user", "pw", "my-realm")).Methods("PUT") //PUT or PATCH?
-	r.HandleFunc("/api/signup", createUser).Methods("POST")
-	r.HandleFunc("/get-token", getTokenHandler).Methods("GET")
+	// Will print base64 encoded of data. Header request format: Basic <b64EncodedString>
+	fmt.Printf("Data encoded: %v", dataEncoded)
+	fmt.Println("")
 
 	s := &http.Server{
 		Addr:    ":8000",
-		Handler: r,
+		Handler: initRoutes(r),
 	}
 
 	log.Fatal(s.ListenAndServe())
+}
+
+// Router
+func initRoutes() *Router {
+	r.HandleFunc("/", homeHandler).Methods("GET")
+	r.HandleFunc("/certificates", getCertificates).Methods("GET")
+	r.HandleFunc("/users/{id}/certificate", createCertificate).Methods("POST")
+	r.HandleFunc("/certificate/{id}", getCertificate).Methods("GET")
+	r.HandleFunc("/users/{userId}/certificate/{id}", patchCertificate).Methods("PATCH")
+	r.HandleFunc("/certificate/{id}", deleteCertificate).Methods("DELETE")
+	r.HandleFunc("/users/{userId}/certificates", getUsersCertificates).Methods("GET")
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", createTransfer).Methods("POST")                                          // PUT OR PATCH?
+	r.HandleFunc("/users/{userId}/certificates/{id}/transfers", basicAuth(acceptTransfer, "userEmail", "pw", "my-realm")).Methods("PUT") //PUT or PATCH?
+	r.HandleFunc("/api/signup", createUser).Methods("POST")
+	r.HandleFunc("/get-token", getTokenHandler).Methods("GET")
+	return r
 }
