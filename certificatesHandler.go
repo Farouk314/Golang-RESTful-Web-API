@@ -11,52 +11,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// HomeHandler default route for testing
-func (a *App) HomeHandler(w http.ResponseWriter, r *http.Request) {
-	// w.Header().Set("Content-Type", "application/json")
-	// if err := json.NewEncoder(w).Encode("HOMEPAGE"); err != nil {
-	// 	fmt.Fprintf(w, err.Error())
-	// }
-	text := r.FormValue("v")
-	if text == "" {
-		http.Error(w, "Missing value", http.StatusBadRequest)
-		return
-	}
-
-	v, err := strconv.Atoi(text)
-	if err != nil {
-		http.Error(w, "not a number: "+text, http.StatusBadRequest)
-		return
-	}
-	fmt.Fprintln(w, v*2)
-}
-
-// GetCertificates route handler GET certificates method
-func (a *App) GetCertificates(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(certificates); err != nil {
-		fmt.Fprintf(w, err.Error())
-	}
-}
-
-// GetCertificate route handler GET certificates/{id} method
-func (a *App) GetCertificate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	params := mux.Vars(r)
-	for _, item := range certificates {
-		if item.ID == params["id"] {
-			if err := json.NewEncoder(w).Encode(item); err != nil {
-				fmt.Fprintf(w, err.Error())
-			}
-			return
-		}
-	}
-}
-
 // GetUsersCertificates route handler get user's certificates method
 func (a *App) GetUsersCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
+	//Authenticate user and pw
 	userEmail, _, _ := r.BasicAuth()
 	var usersCertificates []Certificate
 	for _, item := range certificates {
@@ -65,6 +24,7 @@ func (a *App) GetUsersCertificates(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, err.Error())
 			return
 		}
+		//Check the correct user is attempting to view the page
 		if item.OwnerID == userID && params["userId"] == userID {
 			usersCertificates = append(usersCertificates, item)
 		}
@@ -99,22 +59,10 @@ func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	certificate.OwnerID, _ = LookUpUserIDByEmail(userEmail)
 	// Todo (Farouk): Mock ID - not safe
 	certificate.ID = strconv.Itoa(rand.Intn(1000000))
-	//Go lang time formatting must reference: 2006-01-02T15:04:05Z07:00 (RF3339 Layout)
-	// cca, err := time.Parse(time.ANSIC, certificate.CreatedAt)
-	// if err != nil {
-	// 	w.WriteHeader(http.StatusBadRequest)
-	// 	json.NewEncoder(w).Encode(map[string]interface{}{
-	// 		"createdAt": "Date must be in format ANSIC (Mon Jan _2 15:04:05 2006)",
-	// 	})
-	// }
-	// certificate.CreatedAt = time.Now()
 	certificate.Year = time.Now().Year()
 	certificates = append(certificates, certificate)
 	if err := json.NewEncoder(w).Encode(certificate); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"title": "Title must be populated",
-		})
+		fmt.Fprintf(w, "Could not encode to JSON: %v", err)
 	}
 }
 

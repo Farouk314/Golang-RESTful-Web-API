@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var a App
@@ -55,12 +56,15 @@ func TestHomeHandler(t *testing.T) {
 		t.Fatalf("Expected 4, got %v", i)
 	}
 
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
 }
 
 func TestGetCertificate(t *testing.T) {
 	req := newRequest(t, "GET", "http://localhost:8000/certificates/1", nil)
 	rec := executeRequest(req)
-
+	a.Handler.ServeHTTP(rec, req)
 	a.GetCertificate(rec, req)
 	checkResponseCode(t, http.StatusOK, rec.Code)
 
@@ -87,11 +91,15 @@ func TestGetCertificate(t *testing.T) {
 	if string(cimb) != string(cb) {
 		t.Fatalf("Expected certificate %+v, got %+v", string(cimb), string(cb))
 	}
+
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
 }
 
 func TestGetUsersCertificates(t *testing.T) {
 	req := newRequest(t, "GET", "http://localhost:8000/users/A/certificates", nil)
-	// req.SetBasicAuth("userAEmail", "userApw")
+	req.SetBasicAuth("userAEmail", "userApw")
 	rec := executeRequest(req)
 
 	a.GetUsersCertificates(rec, req)
@@ -104,22 +112,28 @@ func TestGetUsersCertificates(t *testing.T) {
 	defer res.Body.Close()
 
 	//Certificates in memory for user A
+	a.InitInMemoryData()
 	var usersCertificates []Certificate
 	usersCertificates = append(usersCertificates, certificates[0], certificates[1])
-	//fmt.Printf("usersCertificates: %+v", usersCertificates)
 
-	//Certificates from response body
-	var rc []byte
-	fmt.Println("Body:")
-	_, err := res.Body.Read(rc)
-	if err != nil {
-		t.Fatalf("Could not read resp body: %v", err)
-	}
-	fmt.Println(rec.Body) //rec.Body
-	fmt.Println("Attempting to decode body")
-	if err := json.NewDecoder(res.Body).Decode(&rc); err != nil {
+	// Certificates from response body
+	var respCertificates []Certificate
+	if err := json.NewDecoder(res.Body).Decode(&respCertificates); err != nil {
 		t.Fatalf("Could not decode body: %v", err)
 	}
+	rcb, err := json.Marshal(respCertificates)
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err)
+	}
+	ucb, err := json.Marshal(usersCertificates)
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err)
+	}
+	assert.JSONEq(t, string(ucb), string(rcb))
+
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
 }
 
 // func newRequest(t *testing.T, method, url string, body io.Reader) *http.Request {
