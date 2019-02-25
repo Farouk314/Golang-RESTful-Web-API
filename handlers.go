@@ -7,22 +7,22 @@ import (
 )
 
 // InitHandlers : Initiate route handlers
-func InitHandlers() http.Handler {
+func (a *App) InitHandlers() http.Handler {
 	r := mux.NewRouter()
 	userA, userB := 0, 1
-	r.HandleFunc("/", homeHandler).Methods("GET")
-	r.HandleFunc("/certificates", getCertificates).Methods("GET")
-	r.HandleFunc("/certificate/{id}", createCertificate).Methods("POST")
-	r.HandleFunc("/certificate/{id}", getCertificate).Methods("GET")
-	r.HandleFunc("/certificate/{id}", updateCertificate).Methods("PATCH")
-	r.HandleFunc("/certificate/{id}", deleteCertificate).Methods("DELETE")
-	r.HandleFunc("/users/{userId}/certificates", getUsersCertificates).Methods("GET")
+	r.HandleFunc("/Home", a.HomeHandler).Methods("GET")
+	r.HandleFunc("/certificates", a.GetCertificates).Methods("GET")
+	r.HandleFunc("/certificates/{id}", a.CreateCertificate).Methods("POST")
+	r.HandleFunc("/certificates/{id}", a.GetCertificate).Methods("GET")
+	r.HandleFunc("/certificates/{id}", a.UpdateCertificate).Methods("PATCH")
+	r.HandleFunc("/certificates/{id}", a.DeleteCertificate).Methods("DELETE")
+	r.HandleFunc("/users/{userId}/certificates", a.GetUsersCertificates).Methods("GET")
 
 	// TODO (Farouk): PUT OR PATCH?
 	r.HandleFunc("/certificates/{id}/transfers",
-		basicAuth(createTransfer, users[userA].Email, "userApw", "my-realm")).Methods("PATCH")
+		basicAuth(a.CreateTransfer, users[userA].Email, "userApw", "my-realm")).Methods("PATCH")
 	// TODO (Farouk): PUT or PATCH?
 	r.HandleFunc("/certificates/{id}/transfers",
-		basicAuth(acceptTransfer, users[userB].Email, "userBpw", "my-realm")).Methods("PUT")
+		basicAuth(a.AcceptTransfer, users[userB].Email, "userBpw", "my-realm")).Methods("PUT")
 	return r
 }

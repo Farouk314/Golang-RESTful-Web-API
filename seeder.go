@@ -1,6 +1,9 @@
 package main
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Certificates
 var certificates []Certificate
@@ -19,7 +22,7 @@ func LookUpUserIDByEmail(userEmail string) (string, error) {
 }
 
 // InitInMemoryData : initiates some in memory data for testing
-func InitInMemoryData() {
+func (a *App) InitInMemoryData() {
 	userA, userB := 0, 1
 	users = append(users,
 		User{
@@ -33,11 +36,12 @@ func InitInMemoryData() {
 			Name:  "userB",
 		},
 	)
+	//userA's Certificates
 	certificates = append(certificates,
 		Certificate{
 			ID:        "1",
 			Title:     "A certificate title",
-			CreatedAt: "do something for dates",
+			CreatedAt: time.Now(),
 			OwnerID:   users[userA].ID,
 			Year:      2018,
 			Note:      "",
@@ -48,7 +52,7 @@ func InitInMemoryData() {
 		Certificate{
 			ID:        "3",
 			Title:     "A certificate title",
-			CreatedAt: "do something for dates",
+			CreatedAt: time.Now(),
 			OwnerID:   users[userA].ID,
 			Year:      2019,
 			Note:      "",
@@ -62,7 +66,7 @@ func InitInMemoryData() {
 		Certificate{
 			ID:        "2",
 			Title:     "A certificate title",
-			CreatedAt: "do something for dates",
+			CreatedAt: time.Now(),
 			OwnerID:   users[userB].ID,
 			Year:      2015,
 			Note:      "",
@@ -73,7 +77,7 @@ func InitInMemoryData() {
 		Certificate{
 			ID:        "7",
 			Title:     "A certificate title",
-			CreatedAt: "do something for dates",
+			CreatedAt: time.Now(),
 			OwnerID:   users[userB].ID,
 			Year:      2000,
 			Note:      "",
