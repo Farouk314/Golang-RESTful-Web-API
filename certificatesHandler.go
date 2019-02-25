@@ -11,40 +11,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// homehandler default route for testing
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode("HOMEPAGE"); err != nil {
-		fmt.Fprintf(w, err.Error())
-	}
-}
-
-// getCertificates route handler GET certificates method
-func getCertificates(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(certificates); err != nil {
-		fmt.Fprintf(w, err.Error())
-	}
-}
-
-// getCertificate route handler GET certificates/{id} method
-func getCertificate(w http.ResponseWriter, r *http.Request) {
+// GetUsersCertificates route handler get user's certificates method
+func (a *App) GetUsersCertificates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	for _, item := range certificates {
-		if item.ID == params["id"] {
-			if err := json.NewEncoder(w).Encode(item); err != nil {
-				fmt.Fprintf(w, err.Error())
-			}
-			return
-		}
-	}
-}
-
-// getUsersCertificates route handler get user's certificates method
-func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	params := mux.Vars(r)
+	//Authenticate user and pw
 	userEmail, _, _ := r.BasicAuth()
 	var usersCertificates []Certificate
 	for _, item := range certificates {
@@ -53,6 +24,7 @@ func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, err.Error())
 			return
 		}
+		//Check the correct user is attempting to view the page
 		if item.OwnerID == userID && params["userId"] == userID {
 			usersCertificates = append(usersCertificates, item)
 		}
@@ -66,14 +38,15 @@ func getUsersCertificates(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// createCertificate route handler POST certificate method
-func createCertificate(w http.ResponseWriter, r *http.Request) {
+// CreateCertificate route handler POST certificate method
+func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var certificate Certificate
 	userEmail, _, _ := r.BasicAuth()
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&certificate); err != nil {
 		fmt.Fprintf(w, err.Error())
+		return
 	}
 	if certificate.Title == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -86,17 +59,15 @@ func createCertificate(w http.ResponseWriter, r *http.Request) {
 	certificate.OwnerID, _ = LookUpUserIDByEmail(userEmail)
 	// Todo (Farouk): Mock ID - not safe
 	certificate.ID = strconv.Itoa(rand.Intn(1000000))
-	// Todo (Farouk): Parse as date
-	certificate.CreatedAt = "DO SOMETHING"
 	certificate.Year = time.Now().Year()
 	certificates = append(certificates, certificate)
 	if err := json.NewEncoder(w).Encode(certificate); err != nil {
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprintf(w, "Could not encode to JSON: %v", err)
 	}
 }
 
-// updateCertificate route handler PATCH certificate/{id} method
-func updateCertificate(w http.ResponseWriter, r *http.Request) {
+// UpdateCertificate route handler PATCH certificate/{id} method
+func (a *App) UpdateCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	for _, item := range certificates {
@@ -116,8 +87,8 @@ func updateCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// deleteCertificate route Handler DELETE certificate/{id} method
-func deleteCertificate(w http.ResponseWriter, r *http.Request) {
+// DeleteCertificate route Handler DELETE certificate/{id} method
+func (a *App) DeleteCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	for index, item := range certificates {
@@ -131,8 +102,8 @@ func deleteCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// createTransfer route handler certificates/{id}/transfers PATCH method
-func createTransfer(w http.ResponseWriter, r *http.Request) {
+// CreateTransfer route handler certificates/{id}/transfers PATCH method
+func (a *App) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	for _, item := range certificates {
@@ -151,8 +122,8 @@ func createTransfer(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// acceptTransfer route handler certificates/{id}/transfers transfer PUT method
-func acceptTransfer(w http.ResponseWriter, r *http.Request) {
+// AcceptTransfer route handler certificates/{id}/transfers transfer PUT method
+func (a *App) AcceptTransfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	userEmail, _, _ := r.BasicAuth()

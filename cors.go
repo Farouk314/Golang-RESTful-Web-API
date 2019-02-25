@@ -7,7 +7,7 @@ import (
 )
 
 // InitCors initialises cors for a given handler func
-func InitCors(handlerFn func() http.Handler) http.Handler {
+func (a *App) InitCors(handlerFn func() http.Handler) http.Handler {
 	headers := handlers.AllowedHeaders([]string{
 		"X-Requested-With",
 		"Content-Type",
