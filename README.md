@@ -10,6 +10,7 @@ This is a sample RESTful API using Go.
 # Docker build
 
 `docker gorestapi -t build .`
+
 `docker run -rm -d -p 8000:8000/tcp gorestapi:latest`
 
 # Running all tests
