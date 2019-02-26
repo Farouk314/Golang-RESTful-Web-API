@@ -19,6 +19,7 @@ func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	var certificate Certificate
 	var rc Certificate
+
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&rc); err != nil {
 		fmt.Fprintf(w, err.Error())
@@ -85,6 +86,8 @@ func (a *App) UpdateCertificate(w http.ResponseWriter, r *http.Request) {
 	for index, item := range certificates {
 		if item.ID == params["id"] && item.OwnerID == userID {
 			var c Certificate
+
+			defer r.Body.Close()
 			if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 				fmt.Fprintf(w, err.Error())
 				return
@@ -133,6 +136,8 @@ func (a *App) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 	for index, item := range certificates {
 		if item.ID == params["id"] && item.OwnerID == userID {
 			var c Certificate
+
+			defer r.Body.Close()
 			if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 				fmt.Fprintf(w, err.Error())
 				return

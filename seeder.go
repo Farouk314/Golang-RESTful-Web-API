@@ -11,7 +11,7 @@ var certificates []Certificate
 // Users
 var users []User
 
-// LookUpUserIDByName returns a the UsserID for a specified email address
+// LookUpUserIDByName returns a the userID for a specified userName
 func LookUpUserIDByName(userName string) (string, error) {
 	for _, item := range users {
 		if item.Name == userName {
@@ -19,6 +19,16 @@ func LookUpUserIDByName(userName string) (string, error) {
 		}
 	}
 	return "", errors.New("Could not get user by email: " + userName)
+}
+
+// LookUpUserNameByID returns the userName for a specified userID
+func LookUpUserNameByID(userID string) (string, error) {
+	for _, item := range users {
+		if item.ID == userID {
+			return item.Name, nil
+		}
+	}
+	return "", errors.New("Could not get user by email: " + userID)
 }
 
 // InitInMemoryData : initiates some in memory data for testing
