@@ -16,6 +16,8 @@ This is a sample RESTful API using Go.
 `go test ../...`
 
 # Using godocs
+Viewing documentation via `godoc`
+
 `godoc -http=:6060 -play`
 
 # Exposed Endpoints
