@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -27,9 +28,12 @@ func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	if rc.Title == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"title": "Title must be populated",
-		})
+		fmt.Fprintf(w, "Title must be populated")
+		return
+	}
+	if rc.CreatedAt.Format(time.RFC3339) == "0001-01-01T00:00:00Z" {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "CreatedAt must be populated")
 		return
 	}
 	params := mux.Vars(r)
@@ -40,7 +44,7 @@ func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	//Set by server
 	certificate.OwnerID = userID
 	certificate.ID = params["id"]
-	certificate.Year = rc.CreatedAt.Year()
+	certificate.Year = certificate.CreatedAt.Year()
 	certificate.Transfer = &Transfer{To: "", Status: ""}
 	//Add newly created certificate to in memory data
 	certificates = append(certificates, certificate)
@@ -92,6 +96,11 @@ func (a *App) UpdateCertificate(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, err.Error())
 				return
 			}
+			if c.Title == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, "Title cannot be empty")
+				return
+			}
 			certificates[index].Title = c.Title
 			certificates[index].Note = c.Note
 			if err := json.NewEncoder(w).Encode(certificates[index]); err != nil {
@@ -140,6 +149,10 @@ func (a *App) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
 			if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 				fmt.Fprintf(w, err.Error())
+				return
+			}
+			if c.Transfer.To == "" {
+				fmt.Fprintf(w, "Transfer to must be populated")
 				return
 			}
 			certificates[index].Transfer.To = c.Transfer.To
