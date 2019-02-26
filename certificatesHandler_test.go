@@ -54,6 +54,7 @@ func TestCreateCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not parse time: %v", err)
 	}
+  
 	expectedCertificate := Certificate{
 		ID:        "1",
 		Title:     "Test Certificate",
@@ -166,6 +167,77 @@ func TestUpdateCertificate(t *testing.T) {
 	}
 
 	rcb, err := json.Marshal(rUpdatedCertificate)
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err.Error())
+	}
+
+	ecb, err := json.Marshal(certificates[0])
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err.Error())
+	}
+
+	assert.JSONEq(t, string(ecb), string(rcb))
+
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
+}
+
+func TestDeleteCertificate(t *testing.T) {
+	req := newRequest(t, "DELETE", "http://localhost:8000/certificates/1", nil)
+	req.SetBasicAuth("userA", "")
+	rec := executeRequest(req)
+
+	a.DeleteCertificate(rec, req)
+	checkResponseCode(t, http.StatusOK, rec.Code)
+
+	res := rec.Result()
+	if res == nil {
+		t.Fatalf("Response is nil")
+	}
+
+	for _, item := range certificates {
+		if item.ID == "1" {
+			t.Fatalf("Certificate 1 was not deleted")
+		}
+	}
+
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
+}
+
+func TestCreateTransfer(t *testing.T) {
+	var jsonStrTransferTo = []byte(`{        
+		"transfer": {
+			"to": "userB"
+		}
+	}`)
+	req := newRequest(t, "PATCH", "http://localhost:8000/certificates/1/transfers", bytes.NewBuffer(jsonStrTransferTo))
+	req.SetBasicAuth("userA", "")
+	rec := executeRequest(req)
+
+	a.CreateTransfer(rec, req)
+	checkResponseCode(t, http.StatusOK, rec.Code)
+
+	res := rec.Result()
+	if res == nil {
+		t.Fatalf("Response was nil")
+	}
+
+	//Response certificate
+	var rCertificate Certificate
+
+	//Update the transfer to and status of certificate 1
+	certificates[0].Transfer.To = "userB"
+	certificates[0].Transfer.Status = "Pending transfer"
+
+	defer res.Body.Close()
+	if err := json.NewDecoder(res.Body).Decode(&rCertificate); err != nil {
+		t.Fatalf("Could not decode JSON: %v", err.Error())
+	}
+
+	rcb, err := json.Marshal(rCertificate)
 	if err != nil {
 		t.Fatalf("Could not marshal into JSON: %v", err.Error())
 	}
