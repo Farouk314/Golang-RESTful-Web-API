@@ -5,6 +5,7 @@ This is a sample RESTful API using Go.
 # Normal execution
 
 `go build`
+
 `./gorestapi`
 
 # Docker build
