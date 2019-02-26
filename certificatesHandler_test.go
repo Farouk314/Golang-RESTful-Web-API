@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -36,61 +36,58 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 	}
 }
 
-func TestHomeHandler(t *testing.T) {
-	req := newRequest(t, "GET", "http://localhost:8000/Home?v=2", nil)
+func TestCreateCertificate(t *testing.T) {
+	var jsonStrCertificate = []byte(`{        
+		"title": "Test Certificate",
+		"createdAt": "2019-02-26T00:17:14.1805401Z",
+		"note" : "Certificate sent in request body"
+	}`)
+
+	req := newRequest(t, "POST", "http://localhost:8000/certificates/1", bytes.NewBuffer(jsonStrCertificate))
+	req.SetBasicAuth("userA", "")
 	rec := executeRequest(req)
 
-	a.HomeHandler(rec, req)
-	checkResponseCode(t, http.StatusOK, rec.Code)
-	res := rec.Result()
-	defer res.Body.Close()
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Fatalf("Could not read response: %v", err)
-	}
-	i, err := strconv.Atoi(string(b[0]))
-	if err != nil {
-		t.Fatalf("expected an integer, got %v", string(b))
-	}
-	if i != 4 {
-		t.Fatalf("Expected 4, got %v", i)
-	}
-
-	//Clean up in memory data
-	certificates = certificates[:0]
-	users = users[:0]
-}
-
-func TestGetCertificate(t *testing.T) {
-	req := newRequest(t, "GET", "http://localhost:8000/certificates/1", nil)
-	rec := executeRequest(req)
-	a.Handler.ServeHTTP(rec, req)
-	a.GetCertificate(rec, req)
+	a.CreateCertificate(rec, req)
 	checkResponseCode(t, http.StatusOK, rec.Code)
 
+	createdAt, err := time.Parse(time.RFC3339, "2019-02-26T00:17:14.1805401Z")
+	if err != nil {
+		t.Fatalf("Could not parse time: %v", err)
+	}
+	expectedCertificate := Certificate{
+		ID:        "1",
+		Title:     "Test Certificate",
+		CreatedAt: createdAt,
+		OwnerID:   "A",
+		Year:      2019,
+		Note:      "Certificate sent in request body",
+		Transfer:  &Transfer{To: "", Status: ""},
+	}
+
 	res := rec.Result()
+	if res == nil {
+		t.Fatalf("Response is nil")
+	}
+
+	//Response body certificate
+	var resCertificate Certificate
+
 	defer res.Body.Close()
-
-	// Certificate taken from resp body
-	var certificate Certificate
-	if err := json.NewDecoder(res.Body).Decode(&certificate); err != nil {
-		t.Fatalf("Could not decode resp body: %v", err)
+	if err := json.NewDecoder(res.Body).Decode(&resCertificate); err != nil {
+		t.Fatalf("Could not decode body: %v", err)
 	}
 
-	//Certificate in memory id=1
-	cim := certificates[0]
-	cimb, err := json.Marshal(cim)
+	rcb, err := json.Marshal(resCertificate)
 	if err != nil {
-		t.Fatalf("Could not marshal into JSON: %v", err)
-	}
-	cb, err := json.Marshal(certificate)
-	if err != nil {
-		t.Fatalf("Could not marshal into JSON: %v", err)
+		t.Fatalf("Could not Marshal to JSON: %v", err.Error())
 	}
 
-	if string(cimb) != string(cb) {
-		t.Fatalf("Expected certificate %+v, got %+v", string(cimb), string(cb))
+	ecb, err := json.Marshal(expectedCertificate)
+	if err != nil {
+		t.Fatalf("Could not Marshal to JSON: %v", err.Error())
 	}
+
+	assert.JSONEq(t, string(ecb), string(rcb))
 
 	//Clean up in memory data
 	certificates = certificates[:0]
@@ -99,7 +96,7 @@ func TestGetCertificate(t *testing.T) {
 
 func TestGetUsersCertificates(t *testing.T) {
 	req := newRequest(t, "GET", "http://localhost:8000/users/A/certificates", nil)
-	req.SetBasicAuth("userAEmail", "userApw")
+	req.SetBasicAuth("userA", "")
 	rec := executeRequest(req)
 
 	a.GetUsersCertificates(rec, req)
@@ -109,27 +106,76 @@ func TestGetUsersCertificates(t *testing.T) {
 	if res == nil {
 		t.Fatalf("Response is nil")
 	}
-	defer res.Body.Close()
 
 	//Certificates in memory for user A
-	a.InitInMemoryData()
 	var usersCertificates []Certificate
 	usersCertificates = append(usersCertificates, certificates[0], certificates[1])
 
 	// Certificates from response body
 	var respCertificates []Certificate
+
+	defer res.Body.Close()
 	if err := json.NewDecoder(res.Body).Decode(&respCertificates); err != nil {
 		t.Fatalf("Could not decode body: %v", err)
 	}
+
 	rcb, err := json.Marshal(respCertificates)
 	if err != nil {
 		t.Fatalf("Could not marshal into JSON: %v", err)
 	}
+
 	ucb, err := json.Marshal(usersCertificates)
 	if err != nil {
 		t.Fatalf("Could not marshal into JSON: %v", err)
 	}
+
 	assert.JSONEq(t, string(ucb), string(rcb))
+
+	//Clean up in memory data
+	certificates = certificates[:0]
+	users = users[:0]
+}
+
+func TestUpdateCertificate(t *testing.T) {
+	var jsonStrCertificate = []byte(`{        
+		"title": "Updated Title",
+		"note" : "Updated Note"
+	}`)
+	req := newRequest(t, "PATCH", "http://localhost:8000/certificates/1", bytes.NewBuffer(jsonStrCertificate))
+	req.SetBasicAuth("userA", "")
+	rec := executeRequest(req)
+
+	a.UpdateCertificate(rec, req)
+	checkResponseCode(t, http.StatusOK, rec.Code)
+
+	res := rec.Result()
+	if res == nil {
+		t.Fatalf("Response is nil")
+	}
+
+	//Update certificate 1
+	certificates[0].Title = "Updated Title"
+	certificates[0].Note = "Updated Note"
+
+	//Response certificate
+	var rUpdatedCertificate Certificate
+
+	defer res.Body.Close()
+	if err := json.NewDecoder(res.Body).Decode(&rUpdatedCertificate); err != nil {
+		t.Fatalf("Could not decode JSON: %v", err.Error())
+	}
+
+	rcb, err := json.Marshal(rUpdatedCertificate)
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err.Error())
+	}
+
+	ecb, err := json.Marshal(certificates[0])
+	if err != nil {
+		t.Fatalf("Could not marshal into JSON: %v", err.Error())
+	}
+
+	assert.JSONEq(t, string(ecb), string(rcb))
 
 	//Clean up in memory data
 	certificates = certificates[:0]
