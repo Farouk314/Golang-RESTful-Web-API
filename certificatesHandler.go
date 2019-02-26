@@ -44,7 +44,7 @@ func (a *App) CreateCertificate(w http.ResponseWriter, r *http.Request) {
 	//Set by server
 	certificate.OwnerID = userID
 	certificate.ID = params["id"]
-	certificate.Year = certificate.CreatedAt.Year()
+	certificate.Year = rc.CreatedAt.Year()
 	certificate.Transfer = &Transfer{To: "", Status: ""}
 	//Add newly created certificate to in memory data
 	certificates = append(certificates, certificate)

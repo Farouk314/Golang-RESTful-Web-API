@@ -54,6 +54,7 @@ func TestCreateCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not parse time: %v", err)
 	}
+  
 	expectedCertificate := Certificate{
 		ID:        "1",
 		Title:     "Test Certificate",
@@ -252,47 +253,3 @@ func TestCreateTransfer(t *testing.T) {
 	certificates = certificates[:0]
 	users = users[:0]
 }
-
-// func TestAcceptTransfer(t *testing.T) {
-// 	req := newRequest(t, "PUT", "http://localhost:8000/certificates/1/transfers", nil)
-// 	req.SetBasicAuth("userB", "")
-// 	rec := executeRequest(req)
-
-// 	//Change the transfer to and status of certificate 1, which userB will be accepting
-// 	certificates[0].Transfer.To = "userB"
-// 	certificates[0].Transfer.Status = "Pending transfer"
-
-// 	a.AcceptTransfer(rec, req)
-// 	checkResponseCode(t, http.StatusOK, rec.Code)
-
-// 	res := rec.Result()
-// 	if res == nil {
-// 		t.Fatalf("Response was nil")
-// 	}
-
-// 	//Response certificate
-// 	var rCertificate Certificate
-
-// 	defer res.Body.Close()
-// 	if err := json.NewDecoder(res.Body).Decode(&rCertificate); err != nil {
-// 		t.Fatalf("Could not decode HERE JSON: %v", err.Error())
-// 	}
-
-// 	if rCertificate.Transfer.To != "" {
-// 		t.Fatalf("Did not reset transfer field")
-// 	}
-// 	if rCertificate.Transfer.Status != "" {
-// 		t.Fatalf("Did not reset status field")
-// 	}
-// 	userName, err := LookUpUserIDByName("userB")
-// 	if err != nil {
-// 		t.Fatalf(err.Error())
-// 	}
-// 	if rCertificate.OwnerID != userName {
-// 		t.Fatalf("Did not modify ownerID field, expected B, got %v", rCertificate.OwnerID)
-// 	}
-
-// 	//Clean up in memory data
-// 	certificates = certificates[:0]
-// 	users = users[:0]
-// }

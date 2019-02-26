@@ -18,7 +18,7 @@ func LookUpUserIDByName(userName string) (string, error) {
 			return item.ID, nil
 		}
 	}
-	return "", errors.New("Could not get user by email: " + userName)
+	return "", errors.New("Could not get user by userName: " + userName)
 }
 
 // LookUpUserNameByID returns the userName for a specified userID
@@ -28,7 +28,7 @@ func LookUpUserNameByID(userID string) (string, error) {
 			return item.Name, nil
 		}
 	}
-	return "", errors.New("Could not get user by email: " + userID)
+	return "", errors.New("Could not get user by userID: " + userID)
 }
 
 // InitInMemoryData : initiates some in memory data for testing
